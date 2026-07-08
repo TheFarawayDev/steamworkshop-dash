@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import useSWR from "swr"
 import {
   Loader2,
@@ -13,6 +13,7 @@ import {
   Eye,
   Star,
   Search,
+  ThumbsUp,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -38,6 +39,7 @@ type Totals = {
   favorites: number
   views: number
   comments: number
+  lifetimeSubscriptions: number
 }
 
 type ModsResponse = {
@@ -93,6 +95,14 @@ export function ModsDashboard() {
   const [query, setQuery] = useState("")
   const [selected, setSelected] = useState<Mod | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [seenMods, setSeenMods] = useState<Record<string, { updatedAt: number; commentCount: number }>>({})
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("steam-dashboard-seen")
+      if (stored) setSeenMods(JSON.parse(stored))
+    } catch (err) {}
+  }, [])
 
   const games = data?.games ?? []
   const effectiveGame = useMemo(() => {
@@ -119,6 +129,15 @@ export function ModsDashboard() {
   function openMod(mod: Mod) {
     setSelected(mod)
     setSheetOpen(true)
+    
+    const updatedSeen = {
+      ...seenMods,
+      [mod.id]: { updatedAt: mod.updatedAt ?? 0, commentCount: mod.commentCount },
+    }
+    setSeenMods(updatedSeen)
+    try {
+      localStorage.setItem("steam-dashboard-seen", JSON.stringify(updatedSeen))
+    } catch (err) {}
   }
 
   if (isLoading) {
@@ -151,9 +170,10 @@ export function ModsDashboard() {
   return (
     <div className="flex flex-col gap-6">
       {/* Summary */}
-      <div className="grid grid-cols-2 gap-4 rounded-xl border border-border bg-card p-5 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 rounded-xl border border-primary/10 bg-card/40 p-5 shadow-sm backdrop-blur-md sm:grid-cols-5">
         <SummaryStat label="Published mods" value={formatNumber(t.mods)} />
         <SummaryStat label="Subscribers" value={formatNumber(t.subscriptions)} />
+        <SummaryStat label="Lifetime Subs" value={formatNumber(t.lifetimeSubscriptions)} />
         <SummaryStat label="Favorites" value={formatNumber(t.favorites)} />
         <SummaryStat label="Comments" value={formatNumber(t.comments)} />
       </div>
@@ -205,65 +225,85 @@ export function ModsDashboard() {
 
       {/* List */}
       <ul className="flex flex-col gap-3">
-        {filtered.map((mod) => (
-          <li key={mod.id}>
-            <button
-              type="button"
-              onClick={() => openMod(mod)}
-              className="group flex w-full flex-col gap-3 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/40 sm:flex-row sm:items-center sm:gap-4"
-            >
-              {mod.previewUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={mod.previewUrl || "/placeholder.svg"}
-                  alt=""
-                  className="h-16 w-16 shrink-0 rounded-lg object-cover"
-                />
-              )}
-              <div className="flex min-w-0 flex-1 flex-col gap-2">
-                <div className="flex flex-col gap-1.5">
-                  <span className="inline-flex items-center gap-1.5 font-medium leading-snug text-foreground text-pretty group-hover:text-primary">
-                    {mod.title}
-                    <ExternalLink className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                  </span>
-                  <Badge variant="secondary" className="w-fit font-normal">
-                    {mod.game}
-                  </Badge>
-                </div>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground tabular-nums">
-                  <span className="flex items-center gap-1" title="Date posted">
-                    <CalendarPlus className="size-3.5" />
-                    Posted {formatDate(mod.createdAt)}
-                  </span>
-                  <span className="flex items-center gap-1" title="Date updated">
-                    <CalendarClock className="size-3.5" />
-                    Updated {formatDate(mod.updatedAt)}
-                    <span className="text-muted-foreground/70">
-                      ({formatRelative(mod.updatedAt)})
+        {filtered.map((mod) => {
+          const seen = seenMods[mod.id]
+          const isNewUpdate = seen && (mod.updatedAt ?? 0) > seen.updatedAt
+          const isNewComments = seen && mod.commentCount > seen.commentCount
+          const isUnseen = !seen
+
+          return (
+            <li key={mod.id}>
+              <button
+                type="button"
+                onClick={() => openMod(mod)}
+                className="group flex w-full flex-col gap-3 rounded-xl border border-primary/5 bg-card/60 p-4 text-left shadow-sm backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-muted/50 hover:shadow-md sm:flex-row sm:items-center sm:gap-4"
+              >
+                {mod.previewUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={mod.previewUrl || "/placeholder.svg"}
+                    alt=""
+                    className="h-16 w-16 shrink-0 rounded-lg object-cover ring-1 ring-border/50 transition-transform group-hover:scale-105"
+                  />
+                )}
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
+                  <div className="flex flex-col items-start gap-1.5 sm:flex-row sm:items-center">
+                    <span className="inline-flex items-center gap-1.5 font-semibold leading-snug text-foreground text-pretty group-hover:text-primary transition-colors">
+                      {mod.title}
+                      <ExternalLink className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                     </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      <Badge variant="secondary" className="font-normal bg-secondary/50">
+                        {mod.game}
+                      </Badge>
+                      {isUnseen && <Badge variant="default" className="bg-blue-500 hover:bg-blue-600 font-semibold text-[10px] px-1.5 py-0">NEW</Badge>}
+                      {isNewUpdate && <Badge variant="default" className="bg-green-500 hover:bg-green-600 font-semibold text-[10px] px-1.5 py-0">NEW UPDATE</Badge>}
+                      {isNewComments && <Badge variant="default" className="bg-amber-500 hover:bg-amber-600 font-semibold text-[10px] px-1.5 py-0">NEW COMMENTS</Badge>}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground tabular-nums">
+                    <span className="flex items-center gap-1" title="Date posted">
+                      <CalendarPlus className="size-3.5" />
+                      Posted {formatDate(mod.createdAt)}
+                    </span>
+                    <span className="flex items-center gap-1" title="Date updated">
+                      <CalendarClock className="size-3.5" />
+                      Updated {formatDate(mod.updatedAt)}
+                      <span className="text-muted-foreground/70">
+                        ({formatRelative(mod.updatedAt)})
+                      </span>
+                    </span>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground tabular-nums sm:gap-4 sm:flex-nowrap">
+                  <span className="flex items-center gap-1" title="Subscribers">
+                    <Users className="size-3.5 text-primary/70" />
+                    {formatNumber(mod.subscriptions)}
+                  </span>
+                  <span className="flex items-center gap-1" title="Favorites">
+                    <Star className="size-3.5 text-yellow-500/70" />
+                    {formatNumber(mod.favorites)}
+                  </span>
+                  <span className="flex items-center gap-1" title="Views">
+                    <Eye className="size-3.5 text-blue-500/70" />
+                    {formatNumber(mod.views)}
+                  </span>
+                  <span className="flex items-center gap-1" title="Score">
+                    <ThumbsUp className="size-3.5 text-green-500/70" />
+                    {formatNumber(mod.votesUp)}
+                  </span>
+                  <span
+                    className={`flex items-center gap-1 font-medium ${isNewComments ? 'text-amber-500' : 'text-foreground'}`}
+                    title="Comments"
+                  >
+                    <MessageSquare className="size-3.5" />
+                    {formatNumber(mod.commentCount)}
                   </span>
                 </div>
-              </div>
-              <div className="flex items-center gap-4 text-xs text-muted-foreground tabular-nums">
-                <span className="flex items-center gap-1" title="Subscribers">
-                  <Users className="size-3.5" />
-                  {formatNumber(mod.subscriptions)}
-                </span>
-                <span className="flex items-center gap-1" title="Favorites">
-                  <Star className="size-3.5" />
-                  {formatNumber(mod.favorites)}
-                </span>
-                <span
-                  className="flex items-center gap-1 font-medium text-foreground"
-                  title="Comments"
-                >
-                  <MessageSquare className="size-3.5" />
-                  {formatNumber(mod.commentCount)}
-                </span>
-              </div>
-            </button>
-          </li>
-        ))}
+              </button>
+            </li>
+          )
+        })}
       </ul>
 
       {filtered.length === 0 && (

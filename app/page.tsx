@@ -1,16 +1,16 @@
-import { Wrench } from "lucide-react"
+import Image from "next/image"
 import { ModsDashboard } from "@/components/mods-dashboard"
 
 export default function Page() {
   return (
-    <main className="mx-auto min-h-screen w-full max-w-3xl px-4 py-12 sm:py-16">
-      <header className="mb-8 flex flex-col gap-3">
-        <div className="flex items-center gap-2.5">
-          <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Wrench className="size-4.5" />
-          </span>
+    <main className="mx-auto min-h-screen w-full max-w-4xl px-4 py-12 sm:py-16">
+      <header className="mb-10 flex flex-col gap-4">
+        <div className="flex items-center gap-4">
+          <div className="relative flex size-14 items-center justify-center overflow-hidden rounded-xl border border-primary/20 bg-black/40 shadow-lg shadow-primary/20 backdrop-blur-md">
+            <Image src="/logo.png" alt="Logo" fill className="object-cover" />
+          </div>
           <div className="flex flex-col">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            <h1 className="bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-3xl font-bold tracking-tight text-transparent">
               TheFarawayDev — Workshop
             </h1>
             <p className="text-sm text-muted-foreground">Your published mods & comments</p>
