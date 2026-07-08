@@ -189,7 +189,7 @@ export function ModsDashboard() {
             className="pl-9"
           />
         </div>
-        <Select value={effectiveGame} onValueChange={setGame}>
+        <Select value={effectiveGame} onValueChange={(v) => v && setGame(v)}>
           <SelectTrigger className="w-full sm:w-[190px]">
             <SelectValue placeholder="Filter by game" />
           </SelectTrigger>
