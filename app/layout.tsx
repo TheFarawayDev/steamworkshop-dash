@@ -3,8 +3,8 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Workshop Mod Scanner',
-  description: 'Scan your published Steam Workshop mods, listed by date and tagged by mod and game.',
+  title: 'TheFarawayDev — Workshop',
+  description: 'Your published Steam Workshop mods, tagged by game, dated by post/update, with comments at a glance.',
   generator: 'v0.app',
   icons: {
     icon: [
