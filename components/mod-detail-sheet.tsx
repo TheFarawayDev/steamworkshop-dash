@@ -11,6 +11,9 @@ import {
   ThumbsDown,
   UserPlus,
   MessageSquare,
+  Bookmark,
+  FileDigit,
+  MessageCirclePlus,
 } from "lucide-react"
 import {
   Sheet,
@@ -21,7 +24,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { ModComments } from "@/components/mod-comments"
-import { formatDate, formatRelative, formatNumber } from "@/lib/format"
+import { formatDate, formatRelative, formatNumber, formatBytes } from "@/lib/format"
 import type { Mod } from "@/app/api/mods/route"
 
 type StatProps = {
@@ -46,10 +49,14 @@ export function ModDetailSheet({
   mod,
   open,
   onOpenChange,
+  isWatched,
+  onToggleWatch,
 }: {
   mod: Mod | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  isWatched?: boolean
+  onToggleWatch?: () => void
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -92,15 +99,31 @@ export function ModDetailSheet({
                     Updated {formatDate(mod.updatedAt)} ({formatRelative(mod.updatedAt)})
                   </span>
                 </div>
-                <a
-                  href={mod.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
-                >
-                  Open on Steam
-                  <ExternalLink className="size-3.5" />
-                </a>
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <a
+                    href={mod.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex w-fit items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                  >
+                    Open on Steam
+                    <ExternalLink className="size-3.5" />
+                  </a>
+                  {onToggleWatch && (
+                    <button
+                      type="button"
+                      onClick={onToggleWatch}
+                      className={`inline-flex w-fit items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                        isWatched
+                          ? "bg-primary/20 text-primary hover:bg-primary/30"
+                          : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                      }`}
+                    >
+                      {isWatched ? "Unwatch" : "Watch"}
+                      <Bookmark className={`size-3.5 ${isWatched ? "fill-primary" : ""}`} />
+                    </button>
+                  )}
+                </div>
               </div>
             </SheetHeader>
 
@@ -116,18 +139,29 @@ export function ModDetailSheet({
                 <Stat icon={UserPlus} label="Followers" value={formatNumber(mod.followers)} />
                 <Stat icon={Star} label="Favorites" value={formatNumber(mod.favorites)} />
                 <Stat icon={Eye} label="Views" value={formatNumber(mod.views)} />
+                <Stat icon={FileDigit} label="File Size" value={formatBytes(mod.fileSize)} />
                 <Stat icon={ThumbsUp} label="Upvotes" value={formatNumber(mod.votesUp)} />
-                <Stat icon={ThumbsDown} label="Downvotes" value={formatNumber(mod.votesDown)} />
               </div>
 
               <Separator />
 
               <div className="flex flex-col gap-3">
-                <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <MessageSquare className="size-4" />
-                  Comments
-                  <span className="text-muted-foreground tabular-nums">({mod.commentCount})</span>
-                </h3>
+                <div className="flex items-center justify-between gap-4">
+                  <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <MessageSquare className="size-4" />
+                    Comments
+                    <span className="text-muted-foreground tabular-nums">({mod.commentCount})</span>
+                  </h3>
+                  <a
+                    href={`${mod.url}#comments`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-2.5 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80"
+                  >
+                    <MessageCirclePlus className="size-3.5" />
+                    Post Comment
+                  </a>
+                </div>
                 <div className="-mx-2 overflow-hidden rounded-lg border border-border">
                   <ModComments modId={mod.id} />
                 </div>

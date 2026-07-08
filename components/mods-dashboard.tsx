@@ -14,6 +14,9 @@ import {
   Star,
   Search,
   ThumbsUp,
+  Bookmark,
+  FileDigit,
+  Plus,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -26,7 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { ModDetailSheet } from "@/components/mod-detail-sheet"
-import { formatDate, formatRelative, formatNumber } from "@/lib/format"
+import { formatDate, formatRelative, formatNumber, formatBytes } from "@/lib/format"
 import type { Mod } from "@/app/api/mods/route"
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
@@ -93,27 +96,45 @@ export function ModsDashboard() {
   const [game, setGame] = useState<string>(DEFAULT_GAME)
   const [sort, setSort] = useState<SortKey>("created-desc")
   const [query, setQuery] = useState("")
+  const [watchUrl, setWatchUrl] = useState("")
   const [selected, setSelected] = useState<Mod | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [seenMods, setSeenMods] = useState<Record<string, { updatedAt: number; commentCount: number }>>({})
+  const [watchedMods, setWatchedMods] = useState<string[]>([])
 
   useEffect(() => {
     try {
       const stored = localStorage.getItem("steam-dashboard-seen")
       if (stored) setSeenMods(JSON.parse(stored))
+      const storedWatched = localStorage.getItem("steam-dashboard-watched-mods")
+      if (storedWatched) setWatchedMods(JSON.parse(storedWatched))
     } catch (err) {}
   }, [])
+
+  const { data: watchedData } = useSWR<{ mods: Mod[] }>(
+    watchedMods.length > 0 ? `/api/mods/watched?ids=${watchedMods.join(",")}` : null,
+    fetcher,
+    { revalidateOnFocus: false }
+  )
+
+  const allMods = useMemo(() => {
+    const map = new Map<string, Mod>()
+    data?.mods.forEach((m) => map.set(m.id, m))
+    watchedData?.mods.forEach((m) => map.set(m.id, m))
+    return Array.from(map.values())
+  }, [data, watchedData])
 
   const games = data?.games ?? []
   const effectiveGame = useMemo(() => {
     if (!data) return DEFAULT_GAME
-    if (game === "all") return "all"
+    if (game === "all" || game === "watched") return game
     return games.includes(game) ? game : "all"
   }, [data, game, games])
 
   const filtered = useMemo(() => {
-    let mods = data?.mods ?? []
-    if (effectiveGame !== "all") mods = mods.filter((m) => m.game === effectiveGame)
+    let mods = allMods
+    if (effectiveGame === "watched") mods = mods.filter((m) => watchedMods.includes(m.id))
+    else if (effectiveGame !== "all") mods = mods.filter((m) => m.game === effectiveGame)
     const q = query.trim().toLowerCase()
     if (q) {
       mods = mods.filter(
@@ -124,7 +145,7 @@ export function ModsDashboard() {
       )
     }
     return sortMods(mods, sort)
-  }, [data, effectiveGame, query, sort])
+  }, [allMods, effectiveGame, query, sort, watchedMods])
 
   function openMod(mod: Mod) {
     setSelected(mod)
@@ -138,6 +159,29 @@ export function ModsDashboard() {
     try {
       localStorage.setItem("steam-dashboard-seen", JSON.stringify(updatedSeen))
     } catch (err) {}
+  }
+
+  function toggleWatch(modId: string) {
+    if (!modId) return
+    const updated = watchedMods.includes(modId)
+      ? watchedMods.filter((id) => id !== modId)
+      : [...watchedMods, modId]
+    setWatchedMods(updated)
+    try {
+      localStorage.setItem("steam-dashboard-watched-mods", JSON.stringify(updated))
+    } catch (err) {}
+  }
+
+  function handleAddWatch(e: React.FormEvent) {
+    e.preventDefault()
+    const match = watchUrl.match(/id=(\d+)/)
+    if (match) {
+      if (!watchedMods.includes(match[1])) toggleWatch(match[1])
+      setWatchUrl("")
+    } else if (/^\d+$/.test(watchUrl)) {
+      if (!watchedMods.includes(watchUrl)) toggleWatch(watchUrl)
+      setWatchUrl("")
+    }
   }
 
   if (isLoading) {
@@ -165,7 +209,16 @@ export function ModsDashboard() {
     )
   }
 
-  const t = data.totals
+  const activeTotals = {
+    mods: filtered.length,
+    subscriptions: filtered.reduce((s, m) => s + m.subscriptions, 0),
+    lifetimeSubscriptions: filtered.reduce((s, m) => s + m.lifetimeSubscriptions, 0),
+    favorites: filtered.reduce((s, m) => s + m.favorites, 0),
+    views: filtered.reduce((s, m) => s + m.views, 0),
+    comments: filtered.reduce((s, m) => s + m.commentCount, 0),
+  }
+
+  const t = activeTotals
 
   return (
     <div className="flex flex-col gap-6">
@@ -180,6 +233,21 @@ export function ModsDashboard() {
 
       {/* Controls */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <form onSubmit={handleAddWatch} className="relative flex w-full sm:w-[300px]">
+          <Input
+            value={watchUrl}
+            onChange={(e) => setWatchUrl(e.target.value)}
+            placeholder="Watch by URL or ID..."
+            className="pr-10"
+          />
+          <button
+            type="submit"
+            disabled={!watchUrl}
+            className="absolute right-1 top-1/2 -translate-y-1/2 rounded-sm p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+          >
+            <Plus className="size-4" />
+          </button>
+        </form>
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -195,6 +263,7 @@ export function ModsDashboard() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All games ({data.count})</SelectItem>
+            <SelectItem value="watched">Watched Mods ({watchedMods.length})</SelectItem>
             {games.map((g) => {
               const n = data.mods.filter((m) => m.game === g).length
               return (
@@ -230,6 +299,7 @@ export function ModsDashboard() {
           const isNewUpdate = seen && (mod.updatedAt ?? 0) > seen.updatedAt
           const isNewComments = seen && mod.commentCount > seen.commentCount
           const isUnseen = !seen
+          const isWatched = watchedMods.includes(mod.id)
 
           return (
             <li key={mod.id}>
@@ -249,6 +319,7 @@ export function ModsDashboard() {
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <div className="flex flex-col items-start gap-1.5 sm:flex-row sm:items-center">
                     <span className="inline-flex items-center gap-1.5 font-semibold leading-snug text-foreground text-pretty group-hover:text-primary transition-colors">
+                      {isWatched && <Bookmark className="size-3.5 fill-primary text-primary" />}
                       {mod.title}
                       <ExternalLink className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                     </span>
@@ -272,6 +343,10 @@ export function ModsDashboard() {
                       <span className="text-muted-foreground/70">
                         ({formatRelative(mod.updatedAt)})
                       </span>
+                    </span>
+                    <span className="flex items-center gap-1" title="File Size">
+                      <FileDigit className="size-3.5" />
+                      {formatBytes(mod.fileSize)}
                     </span>
                   </div>
                 </div>
@@ -312,7 +387,13 @@ export function ModsDashboard() {
         </div>
       )}
 
-      <ModDetailSheet mod={selected} open={sheetOpen} onOpenChange={setSheetOpen} />
+      <ModDetailSheet 
+        mod={selected} 
+        open={sheetOpen} 
+        onOpenChange={setSheetOpen} 
+        isWatched={selected ? watchedMods.includes(selected.id) : false}
+        onToggleWatch={() => selected && toggleWatch(selected.id)}
+      />
     </div>
   )
 }

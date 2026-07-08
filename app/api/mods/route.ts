@@ -53,6 +53,7 @@ export type Mod = {
   tags: string[]
   url: string
   previewUrl: string | null
+  fileSize: number
 }
 
 export async function GET() {
@@ -114,6 +115,7 @@ export async function GET() {
     tags: (item.tags ?? []).map((t) => t.display_name || t.tag || "").filter(Boolean),
     url: `https://steamcommunity.com/sharedfiles/filedetails/?id=${item.publishedfileid}`,
     previewUrl: item.preview_url ?? null,
+    fileSize: Number(item.file_size) || 0,
   }))
 
   mods.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
