@@ -13,6 +13,7 @@ type SteamPublishedFile = {
   short_description?: string
   app_name?: string
   consumer_appid?: number
+  creator?: string
   time_created?: number
   time_updated?: number
   views?: number
@@ -39,6 +40,7 @@ export type Mod = {
   title: string
   description: string
   game: string
+  creatorId?: string
   createdAt: number | null
   updatedAt: number | null
   views: number
@@ -101,6 +103,7 @@ export async function GET() {
     title: item.title?.trim() || "Untitled",
     description: item.short_description?.trim() || "",
     game: item.app_name?.trim() || (item.consumer_appid ? `App ${item.consumer_appid}` : "Unknown"),
+    creatorId: item.creator || STEAM_ID,
     createdAt: item.time_created ?? null,
     updatedAt: item.time_updated ?? null,
     views: item.views ?? 0,

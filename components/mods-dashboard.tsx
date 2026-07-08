@@ -209,13 +209,16 @@ export function ModsDashboard() {
     )
   }
 
+  const MY_STEAM_ID = "76561199121866975"
+  const myMods = filtered.filter(m => !m.creatorId || m.creatorId === MY_STEAM_ID)
+
   const activeTotals = {
-    mods: filtered.length,
-    subscriptions: filtered.reduce((s, m) => s + m.subscriptions, 0),
-    lifetimeSubscriptions: filtered.reduce((s, m) => s + m.lifetimeSubscriptions, 0),
-    favorites: filtered.reduce((s, m) => s + m.favorites, 0),
-    views: filtered.reduce((s, m) => s + m.views, 0),
-    comments: filtered.reduce((s, m) => s + m.commentCount, 0),
+    mods: myMods.length,
+    subscriptions: myMods.reduce((s, m) => s + m.subscriptions, 0),
+    lifetimeSubscriptions: myMods.reduce((s, m) => s + m.lifetimeSubscriptions, 0),
+    favorites: myMods.reduce((s, m) => s + m.favorites, 0),
+    views: myMods.reduce((s, m) => s + m.views, 0),
+    comments: myMods.reduce((s, m) => s + m.commentCount, 0),
   }
 
   const t = activeTotals

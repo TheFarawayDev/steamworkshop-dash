@@ -69,8 +69,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Missing or invalid mod id." }, { status: 400 })
   }
 
+  const owner = searchParams.get("owner") || STEAM_ID
+
   const res = await fetch(
-    `https://steamcommunity.com/comment/PublishedFile_Public/render/${STEAM_ID}/${id}/?count=1000`,
+    `https://steamcommunity.com/comment/PublishedFile_Public/render/${owner}/${id}/?count=1000`,
     { cache: "no-store" },
   )
   if (!res.ok) {

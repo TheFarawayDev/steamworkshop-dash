@@ -163,7 +163,7 @@ export function ModDetailSheet({
                   </a>
                 </div>
                 <div className="-mx-2 overflow-hidden rounded-lg border border-border">
-                  <ModComments modId={mod.id} />
+                  <ModComments modId={mod.id} ownerId={mod.creatorId} />
                 </div>
               </div>
             </div>

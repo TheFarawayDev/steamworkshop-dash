@@ -10,9 +10,9 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type CommentsResponse = { total: number; comments: Comment[] }
 
-export function ModComments({ modId }: { modId: string }) {
+export function ModComments({ modId, ownerId }: { modId: string; ownerId?: string }) {
   const { data, error, isLoading } = useSWR<CommentsResponse>(
-    `/api/comments?id=${modId}`,
+    `/api/comments?id=${modId}${ownerId ? `&owner=${ownerId}` : ""}`,
     fetcher,
     { revalidateOnFocus: false },
   )
