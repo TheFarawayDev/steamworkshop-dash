@@ -1,11 +1,18 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
+import { ServiceWorker } from '@/components/service-worker'
 import './globals.css'
 
 export const metadata: Metadata = {
   title: 'TheFarawayDev — Workshop',
   description: 'Your published Steam Workshop mods, tagged by game, dated by post/update, with comments at a glance.',
   generator: 'v0.app',
+  applicationName: 'Workshop',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Workshop',
+  },
   icons: {
     icon: [
       {
@@ -26,11 +33,8 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  colorScheme: 'light dark',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: 'white' },
-    { media: '(prefers-color-scheme: dark)', color: 'black' },
-  ],
+  colorScheme: 'dark',
+  themeColor: '#141414',
 }
 
 export default function RootLayout({

@@ -5,17 +5,26 @@ export const dynamic = "force-dynamic"
 // TheFarawayDev — the only profile this app scans.
 const STEAM_ID = "76561199121866975"
 
+type SteamVoteData = { score?: number; votes_up?: number; votes_down?: number }
+
 type SteamPublishedFile = {
   publishedfileid: string
   title?: string
+  short_description?: string
   app_name?: string
   consumer_appid?: number
   time_created?: number
   time_updated?: number
   views?: number
   subscriptions?: number
+  lifetime_subscriptions?: number
   favorited?: number
+  followers?: number
+  num_comments_public?: number
   preview_url?: string
+  file_size?: string | number
+  tags?: { tag?: string; display_name?: string }[]
+  vote_data?: SteamVoteData
 }
 
 type SteamResponse = {
@@ -28,30 +37,22 @@ type SteamResponse = {
 export type Mod = {
   id: string
   title: string
+  description: string
   game: string
   createdAt: number | null
   updatedAt: number | null
   views: number
   subscriptions: number
+  lifetimeSubscriptions: number
   favorites: number
+  followers: number
   commentCount: number
+  votesUp: number
+  votesDown: number
+  score: number
+  tags: string[]
   url: string
   previewUrl: string | null
-}
-
-// Fetch just the comment total for a single workshop item (count=1 is enough).
-async function fetchCommentCount(publishedFileId: string): Promise<number> {
-  try {
-    const res = await fetch(
-      `https://steamcommunity.com/comment/PublishedFile_Public/render/${STEAM_ID}/${publishedFileId}/?count=1`,
-      { cache: "no-store" },
-    )
-    if (!res.ok) return 0
-    const data = (await res.json()) as { success?: boolean; total_count?: number }
-    return data.total_count ?? 0
-  } catch {
-    return 0
-  }
 }
 
 export async function GET() {
@@ -70,8 +71,10 @@ export async function GET() {
     url.searchParams.set("steamid", STEAM_ID)
     url.searchParams.set("numperpage", String(perPage))
     url.searchParams.set("page", String(page))
-    url.searchParams.set("return_metadata", "true")
     url.searchParams.set("appid", "0") // 0 = across all games
+    url.searchParams.set("return_metadata", "true")
+    url.searchParams.set("return_short_description", "true")
+    url.searchParams.set("return_vote_data", "true")
 
     const res = await fetch(url, { cache: "no-store" })
     if (!res.ok) {
@@ -92,19 +95,23 @@ export async function GET() {
     if (page > 50) break
   }
 
-  // Fetch comment counts for every mod in parallel.
-  const counts = await Promise.all(raw.map((item) => fetchCommentCount(item.publishedfileid)))
-
-  const mods: Mod[] = raw.map((item, i) => ({
+  const mods: Mod[] = raw.map((item) => ({
     id: item.publishedfileid,
     title: item.title?.trim() || "Untitled",
+    description: item.short_description?.trim() || "",
     game: item.app_name?.trim() || (item.consumer_appid ? `App ${item.consumer_appid}` : "Unknown"),
     createdAt: item.time_created ?? null,
     updatedAt: item.time_updated ?? null,
     views: item.views ?? 0,
     subscriptions: item.subscriptions ?? 0,
+    lifetimeSubscriptions: item.lifetime_subscriptions ?? 0,
     favorites: item.favorited ?? 0,
-    commentCount: counts[i],
+    followers: item.followers ?? 0,
+    commentCount: item.num_comments_public ?? 0,
+    votesUp: item.vote_data?.votes_up ?? 0,
+    votesDown: item.vote_data?.votes_down ?? 0,
+    score: item.vote_data?.score ?? 0,
+    tags: (item.tags ?? []).map((t) => t.display_name || t.tag || "").filter(Boolean),
     url: `https://steamcommunity.com/sharedfiles/filedetails/?id=${item.publishedfileid}`,
     previewUrl: item.preview_url ?? null,
   }))
@@ -113,5 +120,14 @@ export async function GET() {
 
   const games = Array.from(new Set(mods.map((m) => m.game))).sort((a, b) => a.localeCompare(b))
 
-  return NextResponse.json({ steamId: STEAM_ID, count: mods.length, games, mods })
+  const totals = {
+    mods: mods.length,
+    subscriptions: mods.reduce((s, m) => s + m.subscriptions, 0),
+    lifetimeSubscriptions: mods.reduce((s, m) => s + m.lifetimeSubscriptions, 0),
+    favorites: mods.reduce((s, m) => s + m.favorites, 0),
+    views: mods.reduce((s, m) => s + m.views, 0),
+    comments: mods.reduce((s, m) => s + m.commentCount, 0),
+  }
+
+  return NextResponse.json({ steamId: STEAM_ID, count: mods.length, games, totals, mods })
 }
