@@ -177,6 +177,7 @@ export function ModsDashboard() {
     setWatchedMods(updated)
     try {
       localStorage.setItem("steam-dashboard-watched-mods", JSON.stringify(updated))
+      window.dispatchEvent(new Event("mods-watched-changed"))
     } catch (err) {}
   }
 

@@ -24,56 +24,63 @@ export function NotificationManager() {
     setPermission(result)
   }
 
-  useEffect(() => {
-    if (permission !== "granted") return
+  function urlBase64ToUint8Array(base64String: string) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4)
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+    const rawData = window.atob(base64)
+    const outputArray = new Uint8Array(rawData.length)
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i)
+    }
+    return outputArray
+  }
 
-    // Load initial states to avoid triggering notifications on first load
+  async function syncSubscription() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return
+
     try {
-      const storedSeen = localStorage.getItem("steam-dashboard-seen")
-      if (storedSeen) {
-        lastCheckedRef.current = JSON.parse(storedSeen)
+      const reg = await navigator.serviceWorker.ready
+      let sub = await reg.pushManager.getSubscription()
+      
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+      if (!sub && vapidPublicKey) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+        })
       }
-    } catch (e) {}
+      
+      if (sub) {
+        const storedWatched = localStorage.getItem("steam-dashboard-watched-mods")
+        const watchedMods = storedWatched ? JSON.parse(storedWatched) : []
+        const storedSeen = localStorage.getItem("steam-dashboard-seen")
+        const seenMods = storedSeen ? JSON.parse(storedSeen) : {}
 
-    const interval = setInterval(async () => {
-      try {
-        const stored = localStorage.getItem("steam-dashboard-watched-mods")
-        if (!stored) return
-        const watchedIds = JSON.parse(stored) as string[]
-        if (watchedIds.length === 0) return
-
-        const res = await fetch(`/api/mods/watched?ids=${watchedIds.join(",")}`)
-        if (!res.ok) return
-        const data = await res.json()
-
-        const currentSeen = { ...lastCheckedRef.current }
-        let hasChanges = false
-
-        for (const mod of data.mods) {
-          const prev = currentSeen[mod.id]
-          const nowUpdatedAt = mod.updatedAt ?? 0
-          
-          if (prev) {
-            if (nowUpdatedAt > prev.updatedAt) {
-              sendNotification("Mod Updated!", `${mod.title} has a new update.`, mod.id)
-              hasChanges = true
-            } else if (mod.commentCount > prev.commentCount) {
-              sendNotification("New Comment", `${mod.title} has new comments.`, mod.id)
-              hasChanges = true
-            }
-          }
-          currentSeen[mod.id] = { id: mod.id, updatedAt: nowUpdatedAt, commentCount: mod.commentCount, title: mod.title }
-        }
-
-        if (hasChanges) {
-          lastCheckedRef.current = currentSeen
-        }
-      } catch (err) {
-        console.error("Polling error:", err)
+        await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subscription: sub, watchedMods, seenMods })
+        })
       }
-    }, 60 * 1000) // Poll every 1 minute
+    } catch (err) {
+      console.error("Failed to sync push subscription:", err)
+    }
+  }
 
-    return () => clearInterval(interval)
+  useEffect(() => {
+    if (permission === "granted") {
+      syncSubscription()
+      
+      // Also sync when other tabs or components update local storage
+      const handleStorage = () => syncSubscription()
+      window.addEventListener("storage", handleStorage)
+      window.addEventListener("mods-watched-changed", handleStorage)
+      
+      return () => {
+        window.removeEventListener("storage", handleStorage)
+        window.removeEventListener("mods-watched-changed", handleStorage)
+      }
+    }
   }, [permission])
 
   async function sendNotification(title: string, body: string, tag: string) {

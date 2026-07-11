@@ -76,3 +76,26 @@ self.addEventListener("notificationclick", (event) => {
     }),
   )
 })
+
+self.addEventListener("push", (event) => {
+  if (!event.data) return
+  
+  try {
+    const data = event.data.json()
+    event.waitUntil(
+      self.registration.showNotification(data.title || "Workshop Update", {
+        body: data.body || "You have a new notification.",
+        icon: "/icon-512.png",
+        badge: "/icon-dark-32x32.png",
+        vibrate: [100, 50, 100],
+        data: { url: data.url || "/" },
+        tag: data.tag || "default",
+        requireInteraction: true,
+        renotify: true,
+        silent: false
+      })
+    )
+  } catch (e) {
+    console.error("Error parsing push payload", e)
+  }
+})
