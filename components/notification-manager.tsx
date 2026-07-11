@@ -84,6 +84,7 @@ export function NotificationManager() {
           body,
           icon: "/icon-512.png",
           badge: "/icon-dark-32x32.png",
+          // @ts-expect-error - vibrate is not included in all TS NotificationOptions definitions
           vibrate: [100, 50, 100],
           data: { url: "/" },
           tag,
