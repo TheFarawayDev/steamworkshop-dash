@@ -20,7 +20,11 @@ export async function GET(req: Request) {
 
     // Secure the cron endpoint if it's called via HTTP (e.g., from Vercel Cron)
     const authHeader = req.headers.get('authorization')
-    if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (
+      process.env.NODE_ENV !== 'development' && 
+      process.env.CRON_SECRET && 
+      authHeader !== `Bearer ${process.env.CRON_SECRET}`
+    ) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
