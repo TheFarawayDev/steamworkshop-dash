@@ -98,14 +98,32 @@ export function NotificationManager() {
 
   if (!isSupported) return null
 
+  const [isTesting, setIsTesting] = useState(false)
+
+  function handleTestNotification() {
+    if (isTesting) return
+    setIsTesting(true)
+    
+    // Send an immediate notification
+    sendNotification("Test (Active)", "This is what it looks like when the app is open.", "test-active")
+    
+    // Send another one after 5 seconds to test backgrounding
+    setTimeout(() => {
+      sendNotification("Test (Background)", "This is what it looks like when your phone is locked/backgrounded!", "test-bg")
+      setIsTesting(false)
+    }, 5000)
+  }
+
   if (permission === "granted") {
     return (
       <button 
-        onClick={() => sendNotification("Test Notification", "Notifications are active and working!", "test")}
-        className="flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+        onClick={handleTestNotification}
+        disabled={isTesting}
+        title="Click to test notifications (sends one immediately and another in 5 seconds)"
+        className="flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors disabled:opacity-80"
       >
-        <Bell className="size-3.5" />
-        Notifications Active
+        <Bell className={`size-3.5 ${isTesting ? "animate-pulse text-amber-500" : ""}`} />
+        {isTesting ? "Lock your phone now! (5s...)" : "Notifications Active"}
       </button>
     )
   }
