@@ -36,14 +36,26 @@ export function NotificationManager() {
   }
 
   async function syncSubscription() {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return
+    if (!("serviceWorker" in navigator)) {
+      alert("Error: Service Worker is not supported on this browser.")
+      return
+    }
+    if (!("PushManager" in window)) {
+      alert("Error: Push Notifications are not supported. If you are on an iPhone, you MUST add this website to your Home Screen first using the Share button, and open it from there!")
+      return
+    }
 
     try {
       const reg = await navigator.serviceWorker.ready
       let sub = await reg.pushManager.getSubscription()
       
       const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
-      if (!sub && vapidPublicKey) {
+      if (!vapidPublicKey) {
+        alert("Error: VAPID public key is missing from environment variables!")
+        return
+      }
+
+      if (!sub) {
         sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
@@ -56,13 +68,19 @@ export function NotificationManager() {
         const storedSeen = localStorage.getItem("steam-dashboard-seen")
         const seenMods = storedSeen ? JSON.parse(storedSeen) : {}
 
-        await fetch('/api/push/subscribe', {
+        const res = await fetch('/api/push/subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ subscription: sub, watchedMods, seenMods })
         })
+        
+        if (!res.ok) {
+          const text = await res.text()
+          alert("Error saving subscription to database: " + text)
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
+      alert("Failed to sync push subscription: " + err.message)
       console.error("Failed to sync push subscription:", err)
     }
   }

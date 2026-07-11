@@ -1,4 +1,4 @@
-const CACHE = "workshop-shell-v1"
+const CACHE = "workshop-shell-v2"
 const SHELL = ["/", "/icon-512.png", "/manifest.webmanifest"]
 
 self.addEventListener("install", (event) => {
