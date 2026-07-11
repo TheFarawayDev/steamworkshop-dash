@@ -75,7 +75,7 @@ export function ModDetailSheet({
                   className="aspect-video w-full border-b border-border object-cover"
                 />
               )}
-              <div className="flex flex-col gap-3 p-6">
+              <div className="flex flex-col gap-3 p-4 sm:p-6">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="secondary" className="font-normal">
                     {mod.game}
@@ -127,7 +127,7 @@ export function ModDetailSheet({
               </div>
             </SheetHeader>
 
-            <div className="flex flex-col gap-6 px-6 pb-8">
+            <div className="flex flex-col gap-6 px-4 pb-6 sm:px-6 sm:pb-8">
               {mod.description && (
                 <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90 text-pretty">
                   {mod.description}

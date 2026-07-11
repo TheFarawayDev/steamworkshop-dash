@@ -54,10 +54,10 @@ export function NotificationManager() {
           
           if (prev) {
             if (nowUpdatedAt > prev.updatedAt) {
-              sendNotification("Mod Updated!", `${mod.title} has a new update.`)
+              sendNotification("Mod Updated!", `${mod.title} has a new update.`, mod.id)
               hasChanges = true
             } else if (mod.commentCount > prev.commentCount) {
-              sendNotification("New Comment", `${mod.title} has new comments.`)
+              sendNotification("New Comment", `${mod.title} has new comments.`, mod.id)
               hasChanges = true
             }
           }
@@ -75,7 +75,7 @@ export function NotificationManager() {
     return () => clearInterval(interval)
   }, [permission])
 
-  async function sendNotification(title: string, body: string) {
+  async function sendNotification(title: string, body: string, tag: string) {
     if ("serviceWorker" in navigator) {
       const reg = await navigator.serviceWorker.ready
       if (reg) {
@@ -85,6 +85,10 @@ export function NotificationManager() {
           badge: "/icon-dark-32x32.png",
           vibrate: [100, 50, 100],
           data: { url: "/" },
+          tag,
+          requireInteraction: true,
+          renotify: true,
+          silent: false,
         })
       }
     } else {
@@ -97,7 +101,7 @@ export function NotificationManager() {
   if (permission === "granted") {
     return (
       <button 
-        onClick={() => sendNotification("Test Notification", "Notifications are active and working!")}
+        onClick={() => sendNotification("Test Notification", "Notifications are active and working!", "test")}
         className="flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
       >
         <Bell className="size-3.5" />

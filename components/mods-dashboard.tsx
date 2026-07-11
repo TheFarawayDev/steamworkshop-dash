@@ -17,6 +17,7 @@ import {
   Bookmark,
   FileDigit,
   Plus,
+  RefreshCw,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -89,7 +90,7 @@ function SummaryStat({ label, value }: { label: string; value: string }) {
 }
 
 export function ModsDashboard() {
-  const { data, error, isLoading } = useSWR<ModsResponse>("/api/mods", fetcher, {
+  const { data, error, isLoading, mutate } = useSWR<ModsResponse>("/api/mods", fetcher, {
     revalidateOnFocus: false,
   })
 
@@ -111,11 +112,18 @@ export function ModsDashboard() {
     } catch (err) {}
   }, [])
 
-  const { data: watchedData } = useSWR<{ mods: Mod[] }>(
+  const { data: watchedData, mutate: mutateWatched } = useSWR<{ mods: Mod[] }>(
     watchedMods.length > 0 ? `/api/mods/watched?ids=${watchedMods.join(",")}` : null,
     fetcher,
     { revalidateOnFocus: false }
   )
+
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    await Promise.all([mutate(), mutateWatched()])
+    setTimeout(() => setIsRefreshing(false), 500)
+  }
 
   const allMods = useMemo(() => {
     const map = new Map<string, Mod>()
@@ -235,7 +243,7 @@ export function ModsDashboard() {
       </div>
 
       {/* Controls */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
         <form onSubmit={handleAddWatch} className="relative flex w-full sm:w-[300px]">
           <Input
             value={watchUrl}
@@ -260,39 +268,49 @@ export function ModsDashboard() {
             className="pl-9"
           />
         </div>
-        <Select value={effectiveGame} onValueChange={(v) => v && setGame(v)}>
-          <SelectTrigger className="w-full sm:w-[190px]">
-            <SelectValue placeholder="Filter by game" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All games ({data.count})</SelectItem>
-            <SelectItem value="watched">Watched Mods ({watchedMods.length})</SelectItem>
-            {games.map((g) => {
-              const n = data.mods.filter((m) => m.game === g).length
-              return (
-                <SelectItem key={g} value={g}>
-                  {g} ({n})
+        <div className="grid grid-cols-2 gap-3 sm:flex sm:w-auto">
+          <Select value={effectiveGame} onValueChange={(v) => v && setGame(v)}>
+            <SelectTrigger className="w-full sm:w-[190px]">
+              <SelectValue placeholder="Filter by game" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All games ({data.count})</SelectItem>
+              <SelectItem value="watched">Watched Mods ({watchedMods.length})</SelectItem>
+              {games.map((g) => {
+                const n = data.mods.filter((m) => m.game === g).length
+                return (
+                  <SelectItem key={g} value={g}>
+                    {g} ({n})
+                  </SelectItem>
+                )
+              })}
+            </SelectContent>
+          </Select>
+          <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="Sort" />
+            </SelectTrigger>
+            <SelectContent>
+              {SORTS.map((s) => (
+                <SelectItem key={s.value} value={s.value}>
+                  {s.label}
                 </SelectItem>
-              )
-            })}
-          </SelectContent>
-        </Select>
-        <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
-          <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="Sort" />
-          </SelectTrigger>
-          <SelectContent>
-            {SORTS.map((s) => (
-              <SelectItem key={s.value} value={s.value}>
-                {s.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      <div className="text-sm text-muted-foreground tabular-nums">
-        Showing <span className="font-semibold text-foreground">{filtered.length}</span> mods
+      <div className="flex items-center justify-between text-sm text-muted-foreground tabular-nums">
+        <div>Showing <span className="font-semibold text-foreground">{filtered.length}</span> mods</div>
+        <button
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="flex items-center gap-1.5 rounded-md hover:text-foreground disabled:opacity-50 transition-colors"
+        >
+          <RefreshCw className={`size-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+          Refresh
+        </button>
       </div>
 
       {/* List */}

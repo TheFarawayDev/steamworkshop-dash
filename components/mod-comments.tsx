@@ -1,5 +1,6 @@
 "use client"
 
+import { Fragment } from "react"
 import useSWR from "swr"
 import { Loader2, MessageSquareOff } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -9,6 +10,26 @@ import type { Comment } from "@/app/api/comments/route"
 const fetcher = (url: string) => fetch(url).then((r) => r.json())
 
 type CommentsResponse = { total: number; comments: Comment[] }
+
+function renderCommentText(text: string) {
+  if (!text.includes("__EMOTICON__")) return text
+
+  const parts = text.split(/__EMOTICON__(.*?)__EMOTICON_END__/g)
+  return parts.map((part, i) => {
+    if (i % 2 === 1) {
+      return (
+        <img
+          key={i}
+          src={part}
+          alt="emoticon"
+          className="inline-block h-5 w-auto align-sub mx-0.5"
+          loading="lazy"
+        />
+      )
+    }
+    return <Fragment key={i}>{part}</Fragment>
+  })
+}
 
 export function ModComments({ modId, ownerId }: { modId: string; ownerId?: string }) {
   const { data, error, isLoading } = useSWR<CommentsResponse>(
@@ -44,7 +65,7 @@ export function ModComments({ modId, ownerId }: { modId: string; ownerId?: strin
   return (
     <ul className="flex flex-col divide-y divide-border">
       {data.comments.map((c) => (
-        <li key={c.id} className="flex gap-3 px-4 py-3.5">
+        <li key={c.id} className="flex gap-3 px-4 py-3.5 hover:bg-muted/30 transition-colors">
           <Avatar className="size-8 shrink-0">
             {c.avatar ? <AvatarImage src={c.avatar || "/placeholder.svg"} alt="" /> : null}
             <AvatarFallback className="text-xs">
@@ -58,7 +79,7 @@ export function ModComments({ modId, ownerId }: { modId: string; ownerId?: strin
                   href={c.authorUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm font-medium text-foreground hover:text-primary"
+                  className="text-sm font-medium text-foreground hover:text-primary transition-colors"
                 >
                   {c.author}
                 </a>
@@ -74,8 +95,8 @@ export function ModComments({ modId, ownerId }: { modId: string; ownerId?: strin
                 {formatRelative(c.createdAt)}
               </span>
             </div>
-            <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90 text-pretty">
-              {c.text}
+            <p className="whitespace-pre-line text-sm leading-relaxed text-foreground/90 text-pretty break-words">
+              {renderCommentText(c.text)}
             </p>
           </div>
         </li>

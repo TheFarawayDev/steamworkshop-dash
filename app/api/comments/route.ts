@@ -15,7 +15,14 @@ export type Comment = {
 }
 
 function decodeEntities(str: string): string {
-  return str
+  let processed = str.replace(/<img[^>]+src="([^"]+)"[^>]*>/gi, (match, src) => {
+    if (match.includes('emoticon')) {
+      return `__EMOTICON__${src}__EMOTICON_END__`
+    }
+    return match
+  })
+
+  return processed
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<[^>]+>/g, "")
     .replace(/&quot;/g, '"')
