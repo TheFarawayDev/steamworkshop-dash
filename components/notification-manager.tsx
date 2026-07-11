@@ -8,6 +8,7 @@ type ModStat = { id: string; updatedAt: number; commentCount: number; title: str
 export function NotificationManager() {
   const [permission, setPermission] = useState<NotificationPermission>("default")
   const [isSupported, setIsSupported] = useState(false)
+  const [isTesting, setIsTesting] = useState(false)
   const lastCheckedRef = useRef<Record<string, ModStat>>({})
 
   useEffect(() => {
@@ -97,8 +98,6 @@ export function NotificationManager() {
   }
 
   if (!isSupported) return null
-
-  const [isTesting, setIsTesting] = useState(false)
 
   function handleTestNotification() {
     if (isTesting) return
