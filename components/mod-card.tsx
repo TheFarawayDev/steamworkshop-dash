@@ -38,13 +38,14 @@ function WatchButton({ watched, onToggle, className }: { watched: boolean; onTog
       type="button"
       onClick={(e) => {
         e.stopPropagation()
+        navigator.vibrate?.(8)
         onToggle()
       }}
       aria-pressed={watched}
       aria-label={watched ? "Stop watching" : "Watch for updates"}
       title={watched ? "Watching — click to stop" : "Watch for updates"}
       className={cn(
-        "inline-flex size-8 items-center justify-center rounded-lg transition-colors focus-visible:outline-2",
+        "inline-flex size-10 items-center justify-center rounded-lg transition-colors focus-visible:outline-2 active:scale-90 sm:size-8",
         watched ? "text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground",
         className,
       )}
@@ -111,7 +112,7 @@ export const ModCard = memo(function ModCard({ mod, status, watched, foreign, su
 
 export const ModRow = memo(function ModRow({ mod, status, watched, foreign, subsDelta, onOpen, onToggleWatch }: Props) {
   return (
-    <article className="group relative flex items-center gap-3 px-3 py-3 transition-colors hover:bg-muted/50 sm:gap-4 sm:px-4">
+    <article className="group relative flex items-center gap-3 py-3 pl-3 pr-1.5 transition-colors hover:bg-muted/50 active:bg-muted/60 sm:gap-4 sm:px-4">
       <ModThumb src={steamImage(mod.previewUrl, 128, 128)} className="size-14 shrink-0 rounded-lg sm:size-16" />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex min-w-0 items-center gap-2">

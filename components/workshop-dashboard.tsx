@@ -23,12 +23,15 @@ import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { AlertsMenu } from "@/components/alerts-menu"
+import { BottomNav, type NavKey } from "@/components/bottom-nav"
+import { PullToRefresh } from "@/components/pull-to-refresh"
 import { EmptyState, LoadingState, Tab, WatchForm } from "@/components/dashboard-parts"
 import { ModCard, ModRow } from "@/components/mod-card"
 import { StatTiles } from "@/components/stat-tiles"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useAlerts } from "@/hooks/use-alerts"
 import { useLocalStorage } from "@/hooks/use-local-storage"
+import { PHONE_QUERY, useMediaQuery } from "@/hooks/use-media-query"
 import { useStatsHistory } from "@/hooks/use-stats-history"
 import { getStatus, hasActivity, useSeen, useWatched, type ModStatus } from "@/hooks/use-workshop-state"
 import { DEFAULT_GAME, OWNER_NAME, OWNER_STEAM_ID } from "@/lib/config"
@@ -59,6 +62,7 @@ const NO_STATUS: ModStatus = { isNew: false, isUpdated: false, newComments: 0 }
 type View = "grid" | "list"
 type Mode = "mods" | "insights"
 const isView = (v: unknown): v is View => v === "grid" || v === "list"
+const isViewOrNull = (v: unknown): v is View | null => v === null || isView(v)
 const isMode = (v: unknown): v is Mode => v === "mods" || v === "insights"
 const isString = (v: unknown): v is string => typeof v === "string"
 const isOwn = (m: Mod) => !m.creatorId || m.creatorId === OWNER_STEAM_ID
@@ -88,7 +92,7 @@ function Header({
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4 sm:px-6">
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-96.png" alt="" width={32} height={32} className="size-8 shrink-0 rounded-lg ring-1 ring-border" />
+          <img src="/icon.svg" alt="" width={36} height={36} className="size-9 shrink-0 rounded-[10px] shadow-sm shadow-black/20" />
           <div className="flex min-w-0 flex-col leading-tight">
             <span className="truncate text-sm font-semibold">{OWNER_NAME}</span>
             <span className="truncate text-xs text-muted-foreground">
@@ -97,8 +101,8 @@ function Header({
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-0.5">
-          <Button variant="ghost" size="icon" onClick={onRefresh} disabled={refreshing} aria-label="Refresh data" title="Refresh (R)">
+        <div className="flex items-center gap-0.5 [&_button]:size-10 sm:[&_button]:size-8">
+          <Button variant="ghost" size="icon" onClick={onRefresh} disabled={refreshing} aria-label="Refresh data" title="Refresh (R)" className="hidden sm:inline-flex">
             <RefreshCw className={cn("size-[18px]", refreshing && "animate-spin")} />
           </Button>
           {children}
@@ -162,7 +166,10 @@ export function WorkshopDashboard({ initial }: { initial: ModsResponse | null })
 
   const [game, setGame] = useLocalStorage<string>("dash-game", DEFAULT_GAME, isString)
   const [sort, setSort] = useLocalStorage<SortKey>("dash-sort", "updated-desc", isSortKey)
-  const [view, setView] = useLocalStorage<View>("dash-view", "grid", isView)
+  const [storedView, setView] = useLocalStorage<View | null>("dash-view", null, isViewOrNull)
+  const isPhone = useMediaQuery(PHONE_QUERY)
+  // Compact rows suit phones; larger screens get the card grid unless the user picked one.
+  const view: View = storedView ?? (isPhone ? "list" : "grid")
   const [mode, setMode] = useLocalStorage<Mode>("dash-mode", "mods", isMode)
   const [query, setQuery] = useState("")
   const [unreadOnly, setUnreadOnly] = useState(false)
@@ -201,6 +208,11 @@ export function WorkshopDashboard({ initial }: { initial: ModsResponse | null })
     return map
   }, [allMods, seen, seenHydrated])
 
+  const watchedUnread = useMemo(
+    () => allMods.filter((m) => watchedSet.has(m.id) && hasActivity(statuses.get(m.id) ?? NO_STATUS)).length,
+    [allMods, watchedSet, statuses],
+  )
+
   const unreadInScope = useMemo(() => scoped.filter((m) => hasActivity(statuses.get(m.id)!)), [scoped, statuses])
 
   const visible = useMemo(() => {
@@ -228,8 +240,11 @@ export function WorkshopDashboard({ initial }: { initial: ModsResponse | null })
   const byIdRef = useRef(byId)
   byIdRef.current = byId
 
+  // The open sheet gets its own history entry, so the phone's back button/gesture closes it.
+  const pushedRef = useRef(false)
+
   const openMod = useCallback(
-    (id: string) => {
+    (id: string, { push = true }: { push?: boolean } = {}) => {
       const mod = byIdRef.current.get(id)
       if (!mod) return
       const prev = seenRef.current[id]
@@ -239,18 +254,39 @@ export function WorkshopDashboard({ initial }: { initial: ModsResponse | null })
       markSeen([mod])
       const url = new URL(window.location.href)
       url.searchParams.set("mod", id)
-      window.history.replaceState(null, "", url)
+      if (push && !pushedRef.current) {
+        window.history.pushState({ ...window.history.state, sheet: id }, "", url)
+        pushedRef.current = true
+      } else {
+        window.history.replaceState({ ...window.history.state, sheet: id }, "", url)
+      }
     },
     [markSeen],
   )
 
   const onSheetChange = useCallback((open: boolean) => {
-    setSheetOpen(open)
-    if (!open) {
+    if (open) return setSheetOpen(true)
+    setSheetOpen(false)
+    if (pushedRef.current) {
+      pushedRef.current = false
+      window.history.back()
+    } else {
       const url = new URL(window.location.href)
       url.searchParams.delete("mod")
-      window.history.replaceState(null, "", url)
+      const { sheet: _sheet, ...rest } = (window.history.state ?? {}) as Record<string, unknown>
+      window.history.replaceState(rest, "", url)
     }
+  }, [])
+
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      if (!(e.state as { sheet?: string } | null)?.sheet) {
+        pushedRef.current = false
+        setSheetOpen(false)
+      }
+    }
+    window.addEventListener("popstate", onPop)
+    return () => window.removeEventListener("popstate", onPop)
   }, [])
 
   // Deep link: /?mod=<id> (used by notifications), opened once data is ready.
@@ -262,7 +298,7 @@ export function WorkshopDashboard({ initial }: { initial: ModsResponse | null })
     if (!pendingModId || !data || !seenHydrated) return
     if (byId.has(pendingModId)) {
       setPendingModId(null)
-      openMod(pendingModId)
+      openMod(pendingModId, { push: false })
     } else if (!watchedSet.has(pendingModId) || watchedData) {
       setPendingModId(null) // Not one of ours and not watched: nothing to show.
     }
@@ -318,6 +354,41 @@ export function WorkshopDashboard({ initial }: { initial: ModsResponse | null })
     [onSheetChange, setMode],
   )
 
+  // Phone tab bar: Watched is a game-tab shortcut, so remember where to return to.
+  const lastGameRef = useRef(DEFAULT_GAME)
+  useEffect(() => {
+    if (activeTab !== WATCHED) lastGameRef.current = activeTab
+  }, [activeTab])
+
+  const navActive: NavKey = mode === "insights" ? "insights" : activeTab === WATCHED ? "watched" : "mods"
+  const onNav = useCallback(
+    (key: NavKey) => {
+      const same = key === navActive
+      if (key === "search") {
+        setMode("mods")
+        requestAnimationFrame(() => {
+          searchRef.current?.focus()
+          searchRef.current?.scrollIntoView({ block: "center", behavior: "smooth" })
+        })
+        return
+      }
+      if (same) return window.scrollTo({ top: 0, behavior: "smooth" })
+      if (key === "insights") setMode("insights")
+      else {
+        setMode("mods")
+        setGame(key === "watched" ? WATCHED : lastGameRef.current)
+      }
+      window.scrollTo({ top: 0 })
+    },
+    [navActive, setGame, setMode],
+  )
+
+  // Keep the selected game chip visible in the horizontally scrolling row.
+  const tabsRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    tabsRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" })
+  }, [activeTab])
+
   const scopeLabel = activeTab === ALL ? "all games" : activeTab === WATCHED ? "watched mods" : activeTab
   const countFor = (g: string) => data?.mods.filter((m) => m.game === g).length ?? 0
 
@@ -348,7 +419,8 @@ export function WorkshopDashboard({ initial }: { initial: ModsResponse | null })
         <AlertsMenu alerts={alerts} watchedCount={watched.length} />
       </Header>
 
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pb-16 pt-6 sm:px-6 sm:pt-8">
+      <PullToRefresh onRefresh={refresh} refreshing={refreshing}>
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5 sm:gap-6 sm:px-6 sm:pb-16 sm:pt-8">
         {isLoading && !data ? (
           <LoadingState />
         ) : error && !data ? (
@@ -374,12 +446,13 @@ export function WorkshopDashboard({ initial }: { initial: ModsResponse | null })
             <div className="flex flex-col gap-3">
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
-                  <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Workshop</h1>
+                  <h1 className="text-xl font-semibold tracking-tight sm:text-3xl">Workshop</h1>
                   <p className="text-sm text-muted-foreground">
                     Totals for <span className="font-medium text-foreground">{scopeLabel}</span>
                     {history.baselineAt && <> · change since {formatRelative(Math.floor(history.baselineAt / 1000))}</>}
                   </p>
                 </div>
+                <div className="hidden sm:block">
                 <Segmented
                   label="Section"
                   value={mode}
@@ -389,11 +462,12 @@ export function WorkshopDashboard({ initial }: { initial: ModsResponse | null })
                     { value: "insights", label: "Insights", icon: BarChart3 },
                   ]}
                 />
+                </div>
               </div>
               <StatTiles totals={totals} delta={totalsDelta} since={history.baselineAt} scope={scopeLabel} />
             </div>
 
-            <div role="tablist" aria-label="Filter by game" className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+            <div ref={tabsRef} role="tablist" aria-label="Filter by game" className="scrollbar-none -mx-4 flex snap-x gap-2 overflow-x-auto scroll-px-4 px-4 sm:mx-0 sm:flex-wrap sm:px-0 [&>button]:snap-start">
               <Tab active={activeTab === ALL} onClick={() => setGame(ALL)} count={data?.count}>
                 All games
               </Tab>
@@ -423,9 +497,12 @@ export function WorkshopDashboard({ initial }: { initial: ModsResponse | null })
                       ref={searchRef}
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
+                      type="search"
+                      enterKeyHint="search"
+                      onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
                       placeholder="Search title, tag or description"
                       aria-label="Search mods"
-                      className="h-9 bg-card pl-9 pr-9"
+                      className="h-10 bg-card pl-9 pr-9 sm:h-9 [&::-webkit-search-cancel-button]:appearance-none"
                     />
                     {query ? (
                       <button
@@ -499,8 +576,8 @@ export function WorkshopDashboard({ initial }: { initial: ModsResponse | null })
                   </span>
                   <span className="flex items-center gap-4">
                     {unreadInScope.length > 0 && (
-                      <button type="button" onClick={() => markSeen(unreadInScope)} className="inline-flex items-center gap-1.5 text-xs font-medium hover:text-foreground">
-                        <CheckCheck className="size-3.5" /> Mark all as read
+                      <button type="button" onClick={() => markSeen(unreadInScope)} className="-my-2 inline-flex items-center gap-1.5 py-2 text-xs font-medium hover:text-foreground">
+                        <CheckCheck className="size-3.5" /> <span className="sm:hidden">Read all</span><span className="hidden sm:inline">Mark all as read</span>
                       </button>
                     )}
                     {visible.length > 0 && (
@@ -510,7 +587,7 @@ export function WorkshopDashboard({ initial }: { initial: ModsResponse | null })
                         className="inline-flex items-center gap-1.5 text-xs font-medium hover:text-foreground"
                         title="Download the mods shown as a CSV spreadsheet"
                       >
-                        <Download className="size-3.5" /> Export CSV
+                        <Download className="size-3.5" /> <span className="sm:hidden">CSV</span><span className="hidden sm:inline">Export CSV</span>
                       </button>
                     )}
                   </span>
@@ -540,6 +617,13 @@ export function WorkshopDashboard({ initial }: { initial: ModsResponse | null })
           </>
         )}
       </main>
+      </PullToRefresh>
+
+      <BottomNav
+        active={navActive}
+        onSelect={onNav}
+        badges={{ watched: watchedUnread }}
+      />
 
       {selectedId && (
         <ModDetailSheet

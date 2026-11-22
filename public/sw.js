@@ -1,6 +1,6 @@
 /* Workshop dashboard service worker: offline shell + background update checks. */
-const CACHE = "workshop-v4"
-const SHELL = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"]
+const CACHE = "workshop-v5"
+const SHELL = ["/", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/icon-512.png"]
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
