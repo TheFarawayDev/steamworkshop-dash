@@ -1,9 +1,14 @@
 "use client"
 
+import { useState } from "react"
 import {
   Bookmark,
   CalendarClock,
   CalendarPlus,
+  Check,
+  Copy,
+  History,
+  MonitorPlay,
   ExternalLink,
   Eye,
   FileArchive,
@@ -22,20 +27,51 @@ import { ModComments } from "@/components/mod-comments"
 import { ModStatusPills } from "@/components/mod-status"
 import { ModThumb } from "@/components/mod-thumb"
 import type { ModStatus } from "@/hooks/use-workshop-state"
+import { steamImage } from "@/lib/images"
 import { approval } from "@/lib/mods"
 import { formatBytes, formatDate, formatFullNumber, formatNumber, formatPercent, formatRelative } from "@/lib/format"
 import type { Mod } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
-function Stat({ icon: Icon, label, value, title }: { icon: typeof Users; label: string; value: string; title?: string }) {
+function Stat({ icon: Icon, label, value, title, delta }: { icon: typeof Users; label: string; value: string; title?: string; delta?: number | null }) {
   return (
     <div className="flex flex-col gap-1 bg-card p-3" title={title}>
       <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
         <Icon className="size-3.5" />
         {label}
       </span>
-      <span className="text-lg font-semibold tabular-nums">{value}</span>
+      <span className="flex items-baseline gap-1.5">
+        <span className="text-lg font-semibold">{value}</span>
+        {delta ? (
+          <span className={cn("text-xs font-medium tabular-nums", delta > 0 ? "text-updated" : "text-destructive")}>
+            {delta > 0 ? "+" : "−"}
+            {formatNumber(Math.abs(delta))}
+          </span>
+        ) : null}
+      </span>
     </div>
+  )
+}
+
+function CopyLink({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <Button
+      variant="outline"
+      size="icon-lg"
+      aria-label="Copy link"
+      title="Copy link"
+      onClick={async () => {
+        try {
+          if (navigator.share && matchMedia("(pointer: coarse)").matches) await navigator.share({ url })
+          else await navigator.clipboard.writeText(url)
+          setCopied(true)
+          setTimeout(() => setCopied(false), 1500)
+        } catch {}
+      }}
+    >
+      {copied ? <Check className="text-updated" /> : <Copy />}
+    </Button>
   )
 }
 
@@ -72,6 +108,8 @@ export function ModDetailSheet({
   newCommentsSince,
   isWatched,
   onToggleWatch,
+  onTagClick,
+  delta,
 }: {
   mod: Mod | null
   open: boolean
@@ -81,6 +119,9 @@ export function ModDetailSheet({
   newCommentsSince?: number
   isWatched: boolean
   onToggleWatch: () => void
+  onTagClick?: (tag: string) => void
+  /** Changes since the stats baseline. */
+  delta?: { subscriptions?: number | null; favorites?: number | null; views?: number | null; since?: number | null }
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -88,7 +129,7 @@ export function ModDetailSheet({
         {mod && (
           <>
             <div className="relative">
-              <ModThumb src={mod.previewUrl} className="aspect-video w-full" />
+              <ModThumb src={steamImage(mod.previewUrl, 1280)} className="aspect-video w-full" />
               <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-popover to-transparent" />
             </div>
 
@@ -117,14 +158,28 @@ export function ModDetailSheet({
                   <Bookmark className={cn(isWatched && "fill-current")} />
                   {isWatched ? "Watching" : "Watch"}
                 </Button>
+                <a href={`steam://url/CommunityFilePage/${mod.id}`} className={buttonVariants({ variant: "outline", size: "icon-lg" })} aria-label="Open in the Steam app" title="Open in the Steam app">
+                  <MonitorPlay />
+                </a>
+                <a
+                  href={`https://steamcommunity.com/sharedfiles/filedetails/changelog/${mod.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={buttonVariants({ variant: "outline", size: "icon-lg" })}
+                  aria-label="Change notes"
+                  title="Change notes"
+                >
+                  <History />
+                </a>
+                <CopyLink url={mod.url} />
               </div>
 
               <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border sm:grid-cols-3">
-                <Stat icon={Users} label="Subscribers" value={formatNumber(mod.subscriptions)} title={formatFullNumber(mod.subscriptions)} />
+                <Stat icon={Users} label="Subscribers" value={formatNumber(mod.subscriptions)} title={formatFullNumber(mod.subscriptions)} delta={delta?.subscriptions} />
                 <Stat icon={TrendingUp} label="Lifetime subs" value={formatNumber(mod.lifetimeSubscriptions)} title={formatFullNumber(mod.lifetimeSubscriptions)} />
-                <Stat icon={Heart} label="Favorites" value={formatNumber(mod.favorites)} title={formatFullNumber(mod.favorites)} />
+                <Stat icon={Heart} label="Favorites" value={formatNumber(mod.favorites)} title={formatFullNumber(mod.favorites)} delta={delta?.favorites} />
                 <Stat icon={UserPlus} label="Followers" value={formatNumber(mod.followers)} title={formatFullNumber(mod.followers)} />
-                <Stat icon={Eye} label="Views" value={formatNumber(mod.views)} title={formatFullNumber(mod.views)} />
+                <Stat icon={Eye} label="Views" value={formatNumber(mod.views)} title={formatFullNumber(mod.views)} delta={delta?.views} />
                 <Stat icon={FileArchive} label="File size" value={formatBytes(mod.fileSize)} />
               </div>
 
@@ -137,8 +192,15 @@ export function ModDetailSheet({
               {mod.tags.length > 0 && (
                 <ul className="flex flex-wrap gap-1.5" aria-label="Tags">
                   {mod.tags.map((t) => (
-                    <li key={t} className="rounded-md border px-2 py-0.5 text-xs text-muted-foreground">
-                      {t}
+                    <li key={t}>
+                      <button
+                        type="button"
+                        onClick={() => onTagClick?.(t)}
+                        className="rounded-md border px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                        title={`Search for “${t}”`}
+                      >
+                        {t}
+                      </button>
                     </li>
                   ))}
                 </ul>

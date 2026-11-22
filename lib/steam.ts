@@ -48,8 +48,16 @@ function apiKey(): string {
   return key
 }
 
-async function steamGet(url: URL): Promise<SteamResponse> {
-  const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(15_000) })
+/** Seconds Steam responses are reused between requests (bypassed with `fresh`). */
+export const STEAM_REVALIDATE = 120
+
+export type FetchOptions = { fresh?: boolean }
+
+async function steamGet(url: URL, { fresh }: FetchOptions = {}): Promise<SteamResponse> {
+  const res = await fetch(url, {
+    ...(fresh ? { cache: "no-store" as const } : { next: { revalidate: STEAM_REVALIDATE, tags: ["steam"] } }),
+    signal: AbortSignal.timeout(15_000),
+  })
   if (!res.ok) throw new SteamError(`Steam API request failed (${res.status}).`)
   return (await res.json()) as SteamResponse
 }
@@ -83,7 +91,7 @@ function toMod(item: SteamPublishedFile, fallbackCreator = ""): Mod {
 }
 
 /** Every Workshop item published by `steamId`, across all games. */
-export async function getUserMods(steamId: string): Promise<Mod[]> {
+export async function getUserMods(steamId: string, opts: FetchOptions = {}): Promise<Mod[]> {
   const key = apiKey()
   const raw: SteamPublishedFile[] = []
 
@@ -99,7 +107,7 @@ export async function getUserMods(steamId: string): Promise<Mod[]> {
     url.searchParams.set("return_vote_data", "true")
     url.searchParams.set("return_tags", "true")
 
-    const data = await steamGet(url)
+    const data = await steamGet(url, opts)
     const details = data.response?.publishedfiledetails ?? []
     raw.push(...details)
 
@@ -111,7 +119,7 @@ export async function getUserMods(steamId: string): Promise<Mod[]> {
 }
 
 /** Details for arbitrary Workshop item ids (unknown/removed ids are dropped). */
-export async function getModsById(ids: string[]): Promise<Mod[]> {
+export async function getModsById(ids: string[], opts: FetchOptions = {}): Promise<Mod[]> {
   const key = apiKey()
   const unique = Array.from(new Set(ids.filter(isWorkshopId)))
   const chunks: string[][] = []
@@ -126,7 +134,7 @@ export async function getModsById(ids: string[]): Promise<Mod[]> {
       url.searchParams.set("short_description", "true")
       url.searchParams.set("includetags", "true")
       chunk.forEach((id, i) => url.searchParams.set(`publishedfileids[${i}]`, id))
-      const data = await steamGet(url)
+      const data = await steamGet(url, opts)
       return data.response?.publishedfiledetails ?? []
     }),
   )

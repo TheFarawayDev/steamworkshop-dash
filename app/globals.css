@@ -33,6 +33,8 @@
   --color-updated: var(--updated);
   --color-chatter: var(--chatter);
   --color-star: var(--star);
+  --color-chart-1: var(--chart-1);
+  --color-chart-grid: var(--chart-grid);
 
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
@@ -73,6 +75,10 @@
   --updated: oklch(0.56 0.14 155);
   --chatter: oklch(0.62 0.15 65);
   --star: oklch(0.72 0.15 85);
+
+  /* Single-series chart hue, validated against the card surface (dataviz validator). */
+  --chart-1: oklch(0.52 0.17 252);
+  --chart-grid: oklch(0.2 0.02 255 / 8%);
 }
 
 .dark {
@@ -101,6 +107,9 @@
   --updated: oklch(0.76 0.15 155);
   --chatter: oklch(0.8 0.14 70);
   --star: oklch(0.84 0.14 88);
+
+  --chart-1: oklch(0.65 0.14 242);
+  --chart-grid: oklch(1 0 0 / 7%);
 }
 
 @layer base {

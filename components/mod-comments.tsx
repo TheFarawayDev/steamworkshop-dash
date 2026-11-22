@@ -1,8 +1,9 @@
 "use client"
 
 import { Fragment } from "react"
-import useSWR from "swr"
-import { AlertCircle, MessageSquareOff, RotateCw } from "lucide-react"
+import useSWRInfinite from "swr/infinite"
+import { AlertCircle, Loader2, MessageSquareOff, RotateCw } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { fetcher } from "@/lib/fetcher"
@@ -22,6 +23,8 @@ function renderCommentText(text: string) {
   )
 }
 
+const PAGE = 30
+
 export function ModComments({
   modId,
   ownerId,
@@ -32,11 +35,21 @@ export function ModComments({
   ownerId?: string
   newSince?: number
 }) {
-  const { data, error, isLoading, mutate, isValidating } = useSWR<CommentsResponse>(
-    `/api/comments?id=${modId}${ownerId ? `&owner=${ownerId}` : ""}`,
+  const base = `/api/comments?id=${modId}${ownerId ? `&owner=${ownerId}` : ""}&count=${PAGE}`
+  const { data: pages, error, isLoading, isValidating, mutate, size, setSize } = useSWRInfinite<CommentsResponse>(
+    (index, prev: CommentsResponse | null) => (prev && !prev.hasMore ? null : `${base}&start=${index * PAGE}`),
     fetcher,
-    { revalidateOnFocus: false },
+    { revalidateOnFocus: false, revalidateFirstPage: false },
   )
+  const data = pages?.length
+    ? {
+        total: pages[0].total,
+        // New comments shift Steam's offsets, so drop repeats across pages.
+        comments: [...new Map(pages.flatMap((p) => p.comments).map((c) => [c.id, c])).values()],
+        hasMore: pages[pages.length - 1].hasMore,
+      }
+    : undefined
+  const loadingMore = isValidating && !!pages && size > pages.length
 
   if (isLoading) {
     return (
@@ -54,7 +67,7 @@ export function ModComments({
     )
   }
 
-  if (error || !data) {
+  if (!data) {
     return (
       <div className="flex items-center justify-between gap-3 p-4 text-sm text-destructive">
         <span className="flex items-center gap-2">
@@ -112,6 +125,14 @@ export function ModComments({
           </li>
         )
       })}
+      {(data.hasMore || error) && (
+        <li className="flex justify-center p-3">
+          <Button variant="outline" size="sm" disabled={loadingMore} onClick={() => setSize(size + 1)}>
+            {loadingMore ? <Loader2 className="animate-spin" /> : error ? <RotateCw /> : null}
+            {error ? "Retry" : `Show more · ${data.total - data.comments.length} left`}
+          </Button>
+        </li>
+      )}
     </ul>
   )
 }

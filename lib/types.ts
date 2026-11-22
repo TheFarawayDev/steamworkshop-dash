@@ -55,6 +55,6 @@ export type Comment = {
   isOwner: boolean
 }
 
-export type CommentsResponse = { total: number; comments: Comment[] }
+export type CommentsResponse = { total: number; start: number; comments: Comment[]; hasMore: boolean }
 
 export type ApiError = { error: string }
