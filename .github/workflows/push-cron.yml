@@ -12,5 +12,5 @@ jobs:
     steps:
       - name: Hit Vercel Cron Endpoint
         run: |
-          curl -X GET "https://mod-list-generator.vercel.app/api/push/cron" \
+          curl --fail-with-body -sS -X GET "https://mod-list-generator.vercel.app/api/push/cron" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

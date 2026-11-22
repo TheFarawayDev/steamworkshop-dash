@@ -1,35 +1,21 @@
 import type { MetadataRoute } from "next"
+import { APP_DESCRIPTION, APP_NAME } from "@/lib/config"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "TheFarawayDev — Workshop",
+    name: APP_NAME,
     short_name: "Workshop",
-    description:
-      "Your published Steam Workshop mods, tagged by game, dated by post/update, with comments at a glance.",
+    description: APP_DESCRIPTION,
+    id: "/",
     start_url: "/",
+    scope: "/",
     display: "standalone",
-    background_color: "#141414",
-    theme_color: "#141414",
-    orientation: "portrait-primary",
+    background_color: "#14171d",
+    theme_color: "#14171d",
     icons: [
-      {
-        src: "/icon-512.png",
-        sizes: "192x192",
-        type: "image/png",
-        purpose: "any",
-      },
-      {
-        src: "/icon-512.png",
-        sizes: "512x512",
-        type: "image/png",
-        purpose: "any",
-      },
-      {
-        src: "/icon-512.png",
-        sizes: "512x512",
-        type: "image/png",
-        purpose: "maskable",
-      },
+      { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   }
 }

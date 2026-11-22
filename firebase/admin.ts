@@ -1,18 +1,23 @@
-import { initializeApp, getApps, cert } from 'firebase-admin/app'
-import { getFirestore } from 'firebase-admin/firestore'
+import "server-only"
+import { cert, getApps, initializeApp } from "firebase-admin/app"
+import { getFirestore, type Firestore } from "firebase-admin/firestore"
 
-if (!getApps().length) {
+function init(): Firestore | null {
+  if (getApps().length) return getFirestore()
+
+  const { FIREBASE_PROJECT_ID: projectId, FIREBASE_CLIENT_EMAIL: clientEmail, FIREBASE_PRIVATE_KEY } = process.env
+  if (!projectId || !clientEmail || !FIREBASE_PRIVATE_KEY) return null
+
   try {
     initializeApp({
-      credential: cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      }),
+      credential: cert({ projectId, clientEmail, privateKey: FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n") }),
     })
+    return getFirestore()
   } catch (error) {
-    console.error('Firebase admin initialization error', error)
+    console.error("Firebase admin initialization error", error)
+    return null
   }
 }
 
-export const db = getApps().length ? getFirestore() : null
+/** Firestore client, or null when Firebase credentials are not configured. */
+export const db = init()

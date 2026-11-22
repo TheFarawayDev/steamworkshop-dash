@@ -2,17 +2,13 @@
 
 import { useEffect } from "react"
 
+/** Registers /sw.js (offline shell + push notifications). */
 export function ServiceWorker() {
   useEffect(() => {
-    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return
-    const onLoad = () => {
-      navigator.serviceWorker.register("/sw.js").catch(() => {
-        // Registration failures are non-fatal; the app still works online.
-      })
-    }
-    window.addEventListener("load", onLoad)
-    return () => window.removeEventListener("load", onLoad)
+    if (!("serviceWorker" in navigator)) return
+    navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).catch(() => {
+      // Non-fatal: the app still works online without it.
+    })
   }, [])
-
   return null
 }

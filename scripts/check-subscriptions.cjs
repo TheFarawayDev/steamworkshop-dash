@@ -1,5 +1,5 @@
 const fs = require('fs');
-const env = fs.readFileSync('.env.local', 'utf8').split('\n');
+const env = fs.readFileSync(require('path').join(__dirname, '..', '.env.local'), 'utf8').split('\n');
 env.forEach(line => {
   const [key, ...val] = line.split('=');
   if (key && val.length) {
@@ -20,7 +20,7 @@ initializeApp({
 getFirestore().collection('subscriptions').get().then(snapshot => {
   console.log('Total subscriptions:', snapshot.size);
   snapshot.forEach(doc => {
-    console.log(doc.id, 'watchedMods:', doc.data().watchedMods);
+    console.log(doc.id, 'watchedMods:', doc.data().watchedMods, 'notified:', Object.keys(doc.data().notified ?? doc.data().seenMods ?? {}).length);
   });
   process.exit(0);
 }).catch(console.error);
